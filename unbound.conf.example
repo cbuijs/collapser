@@ -1,0 +1,19 @@
+server:
+	verbosity: 1
+	port: 53
+        interface: 0.0.0.0
+        access-control: 0.0.0.0/0 allow
+        chroot: ""
+	logfile: ""
+	use-syslog: yes
+	log-queries: yes
+	log-servfail: yes
+	module-config: "python iterator"
+	rrset-roundrobin: yes
+        minimal-responses: yes
+	qname-minimisation: yes
+	cache-min-ttl: 30
+
+python:
+        python-script: "collapser.py"
+
