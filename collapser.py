@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 '''
 =========================================================================================
- dns-filter.py: v0.55-20190118 Copyright (C) 2019 Chris Buijs <cbuijs@chrisbuijs.com>
+ collapser.py: v0.02-20190831 Copyright (C) 2019 Chris Buijs <cbuijs@chrisbuijs.com>
 =========================================================================================
 
- DNS filtering extension for the unbound DNS resolver.
+ Unbound Python Module to collapse CNAME-Chains
 
 =========================================================================================
 '''
@@ -56,8 +56,7 @@ def decode_data(rawdata, start):
 
 # Initialization
 def init(id, cfg):
-    log_info('COLLAPSER: Initializing ...')
-
+    log_info('COLLAPSER: Initialized')
     return True
 
 # Unload/Finish-up
@@ -100,9 +99,8 @@ def operate(id, event, qstate, qdata):
                     data = rep.rrsets[rrset].entry.data
 
                     # Equalize TTLS
-                    if config['equalizettl']:
-                        for rr in range(0, data.count):
-                            data.rr_ttl[rr] = repttl
+                    for rr in range(0, data.count):
+                        data.rr_ttl[rr] = repttl
 
                     # Check data
                     for rr in range(0, data.count):
@@ -111,30 +109,32 @@ def operate(id, event, qstate, qdata):
                         rrs.append((rdname, repttl, rdtype, rdata))
 
                 firstname = rrs[0][0]
+                rmsg = False
 
                 if rrs[-1][2] == 'A':
                     rmsg = DNSMessage(firstname, RR_TYPE_A, RR_CLASS_IN, PKT_QR | PKT_RA )
-                else:
+                elif rrs[-1][2] == 'AAAA':
                     rmsg = DNSMessage(firstname, RR_TYPE_AAAA, RR_CLASS_IN, PKT_QR | PKT_RA )
 
-                count = 0
-                for rr in rrs:
-                    if rr[2] == rrs[-1][2]:
-                        count += 1
-                        rmsg.answer.append('{0} {1} IN {2} {3}'.format(firstname, repttl, rr[2], rr[3]))
+                if rmsg:
+                    count = 0
+                    for rr in rrs:
+                        if rr[2] == rrs[-1][2]:
+                            count += 1
+                            rmsg.answer.append('{0} {1} IN {2} {3}'.format(firstname, repttl, rr[2], rr[3]))
 
-                rmsg.set_return_msg(qstate)
-                if not rmsg.set_return_msg(qstate):
-                    log_err('COLLAPSER ERROR: ' + str(rmsg.answer))
-                    qstate.ext_state[id] = MODULE_ERROR
-                    return True
+                    rmsg.set_return_msg(qstate)
+                    if not rmsg.set_return_msg(qstate):
+                        log_err('COLLAPSER ERROR: ' + str(rmsg.answer))
+                        qstate.ext_state[id] = MODULE_ERROR
+                        return True
 
-                log_info('COLLAPSER: {0}/{1} went from {2} to {3} ({4}) RRs'.format(firstname, rrs[0][2], len(rrs), count, rrs[-1][2]))
-                # Cache new answer
-                invalidateQueryInCache(qstate, qstate.return_msg.qinfo)
-                qstate.no_cache_store = 0
-                qstate.return_msg.rep.security = 2
-                storeQueryInCache(qstate, qstate.return_msg.qinfo, qstate.return_msg.rep, 0)
+                    log_info('COLLAPSER: {0}/{1} went from {2} to {3} ({4}) RRs'.format(firstname, rrs[0][2], len(rrs), count, rrs[-1][2]))
+                    # Cache new answer
+                    invalidateQueryInCache(qstate, qstate.return_msg.qinfo)
+                    qstate.no_cache_store = 0
+                    qstate.return_msg.rep.security = 2
+                    storeQueryInCache(qstate, qstate.return_msg.qinfo, qstate.return_msg.rep, 0)
 
             else:
                 qstate.return_rcode = rc
