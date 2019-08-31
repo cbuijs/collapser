@@ -15,5 +15,5 @@ server:
 	cache-min-ttl: 30
 
 python:
-        python-script: "collapser.py"
+        python-script: "/path/to/collapser.py"
 
